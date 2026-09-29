@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: minhacestinha
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d minhacestinha"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/minhacestinha
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-em-producao}
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<!-- Página de exemplo no layout da consulta pública da NFC-e da Sefaz-SP. Dados fictícios. -->
+<html lang="pt-br">
+<head><meta charset="utf-8"><title>Consulta NFC-e</title></head>
+<body>
+<div id="conteudo">
+  <div class="txtCenter">
+    <div id="u20" class="txtTopo">MERCADO DA VILA LTDA</div>
+    <div class="text">CNPJ: 12.345.678/0001-90</div>
+    <div class="text">RUA DAS FLORES, 123, , CENTRO, SAO PAULO, SP</div>
+  </div>
+  <table id="tabResult">
+    <tr id="Item + 1">
+      <td valign="top"><span class="txtTit">LTE COND INTEG ITAMB 1L</span><span class="RCod">(Código: 7896051111115 )</span><br>
+        <span class="Rqtd"><strong>Qtde.:</strong>2</span><span class="RUN"><strong>UN: </strong>UN</span>
+        <span class="RvlUnit"><strong>Vl. Unit.:</strong>&nbsp;7,9</span></td>
+      <td align="right" valign="top" class="txtTit noWrap">Vl. Total<br><span class="valor">15,80</span></td>
+    </tr>
+    <tr id="Item + 2">
+      <td valign="top"><span class="txtTit">BAN PRATA KG</span><span class="RCod">(Código: 1234 )</span><br>
+        <span class="Rqtd"><strong>Qtde.:</strong>1,2</span><span class="RUN"><strong>UN: </strong>kg</span>
+        <span class="RvlUnit"><strong>Vl. Unit.:</strong>&nbsp;6,98</span></td>
+      <td align="right" valign="top" class="txtTit noWrap">Vl. Total<br><span class="valor">8,38</span></td>
+    </tr>
+    <tr id="Item + 3">
+      <td valign="top"><span class="txtTit">CAFE TORR PILAO 500G</span><span class="RCod">(Código: 7891000100103 )</span><br>
+        <span class="Rqtd"><strong>Qtde.:</strong>1</span><span class="RUN"><strong>UN: </strong>UN</span>
+        <span class="RvlUnit"><strong>Vl. Unit.:</strong>&nbsp;24,5</span></td>
+      <td align="right" valign="top" class="txtTit noWrap">Vl. Total<br><span class="valor">24,50</span></td>
+    </tr>
+    <tr id="Item + 4">
+      <td valign="top"><span class="txtTit">DET LIQ YPE NEUT 500</span><span class="RCod">(Código: 7896000001238 )</span><br>
+        <span class="Rqtd"><strong>Qtde.:</strong>1</span><span class="RUN"><strong>UN: </strong>UN</span>
+        <span class="RvlUnit"><strong>Vl. Unit.:</strong>&nbsp;2,79</span></td>
+      <td align="right" valign="top" class="txtTit noWrap">Vl. Total<br><span class="valor">2,79</span></td>
+    </tr>
+  </table>
+  <div id="totalNota" class="txtRight">
+    <div id="linhaTotal"><label>Qtd. total de itens:</label><span class="totalNumb">4</span></div>
+    <div id="linhaTotal"><label>Valor total R$:</label><span class="totalNumb">51,47</span></div>
+    <div id="linhaTotal"><label>Descontos R$:</label><span class="totalNumb">1,47</span></div>
+    <div id="linhaTotal" class="linhaShade"><label>Valor a pagar R$:</label><span class="totalNumb txtMax">50,00</span></div>
+    <div id="linhaForma"><label>Forma de pagamento:</label><span class="totalNumb txtTitR">Valor pago R$:</span></div>
+    <div id="linhaTotal"><label class="tx">Cartão de Débito</label><span class="totalNumb">50,00</span></div>
+  </div>
+</div>
+<div id="infos">
+  <div data-role="collapsible">
+    <h4>Informações gerais da Nota</h4>
+    <ul data-role="listview">
+      <li><strong>Emissão: </strong>26/09/2026 10:15:32 - Via Consumidor
+        <strong>Número: </strong>12345 <strong>Série: </strong>1</li>
+    </ul>
+  </div>
+  <div data-role="collapsible">
+    <h4>Chave de acesso</h4>
+    <ul data-role="listview"><li><span class="chave">3526 0912 3456 7800 0190 6500 1000 0123 4510 0012 3455</span></li></ul>
+  </div>
+</div>
+</body>
+</html>
