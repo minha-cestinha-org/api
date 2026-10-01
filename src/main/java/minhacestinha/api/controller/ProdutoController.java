@@ -44,8 +44,20 @@ public interface ProdutoController {
     ResponseEntity<ProdutoHistoricoResponse> historico(@Parameter(description = "ID do produto", example = "1") @PathVariable Long id,
                                                        @Parameter(hidden = true) @AuthenticationPrincipal User usuario);
 
+    @GetMapping("/ean/{ean}")
+    @Operation(summary = "Modo mercado", description = "Histórico do usuário para o produto do código de barras lido na gôndola.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Histórico encontrado"),
+            @ApiResponse(responseCode = "400", description = "Código de barras inválido"),
+            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido"),
+            @ApiResponse(responseCode = "404", description = "O usuário ainda não comprou esse produto")
+    })
+    ResponseEntity<ProdutoHistoricoResponse> historicoPorEan(
+            @Parameter(description = "Código de barras (EAN/GTIN)", example = "7891000100103") @PathVariable String ean,
+            @Parameter(hidden = true) @AuthenticationPrincipal User usuario);
+
     @PutMapping("/{id}")
-    @Operation(summary = "Corrigir produto", description = "Corrige nome, marca e categoria de um produto que o usuário já comprou.")
+    @Operation(summary = "Corrigir produto", description = "Corrige nome, marca e categoria de um produto que o usuário já comprou. A correção vale só pra ele.")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Produto atualizado"),
             @ApiResponse(responseCode = "400", description = "Dados inválidos"),

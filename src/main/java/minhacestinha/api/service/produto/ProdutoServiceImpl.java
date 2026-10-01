@@ -10,11 +10,15 @@ import minhacestinha.api.persistence.entity.ItemNota;
 import minhacestinha.api.persistence.entity.MapeamentoDescricao;
 import minhacestinha.api.persistence.entity.Mercado;
 import minhacestinha.api.persistence.entity.Produto;
+import minhacestinha.api.persistence.entity.ProdutoUsuario;
 import minhacestinha.api.persistence.entity.User;
 import minhacestinha.api.persistence.repository.ItemNotaRepository;
 import minhacestinha.api.persistence.repository.MapeamentoDescricaoRepository;
 import minhacestinha.api.persistence.repository.ProdutoRepository;
+import minhacestinha.api.persistence.repository.ProdutoUsuarioRepository;
+import minhacestinha.api.service.nfce.NumeroBr;
 import minhacestinha.api.service.nfce.NotaLida.ItemLido;
+import minhacestinha.api.service.padronizacao.ProdutoPadronizado;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,14 +41,15 @@ public class ProdutoServiceImpl implements ProdutoService {
     private final ProdutoRepository produtoRepository;
     private final MapeamentoDescricaoRepository mapeamentoRepository;
     private final ItemNotaRepository itemNotaRepository;
+    private final ProdutoUsuarioRepository produtoUsuarioRepository;
     private final Mensagens mensagens;
 
     @Override
     @Transactional
-    public Produto resolver(ItemLido item, Mercado mercado) {
+    public Produto resolver(ItemLido item, Mercado mercado, ProdutoPadronizado sugestao) {
         return mapeamentoRepository.findByDescricaoBrutaAndMercadoId(item.descricaoBruta(), mercado.getId())
                 .map(MapeamentoDescricao::getProduto)
-                .orElseGet(() -> criarMapeamento(item, mercado));
+                .orElseGet(() -> criarMapeamento(item, mercado, sugestao));
     }
 
     @Override
@@ -53,10 +58,13 @@ public class ProdutoServiceImpl implements ProdutoService {
         Map<Produto, List<ItemNota>> comprasPorProduto = itemNotaRepository.findDoUsuario(usuario.getId())
                 .stream()
                 .collect(Collectors.groupingBy(ItemNota::getProduto, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, ProdutoUsuario> correcoes = produtoUsuarioRepository.findByUsuarioId(usuario.getId())
+                .stream()
+                .collect(Collectors.toMap(correcao -> correcao.getProduto().getId(), correcao -> correcao));
 
         return comprasPorProduto.entrySet()
                 .stream()
-                .map(entry -> resumir(entry.getKey(), entry.getValue()))
+                .map(entry -> resumir(entry.getKey(), entry.getValue(), correcoes.get(entry.getKey().getId())))
                 .sorted(Comparator.comparing(ProdutoResumoResponse::ultimaCompra).reversed())
                 .toList();
     }
@@ -80,7 +88,23 @@ public class ProdutoServiceImpl implements ProdutoService {
                         item.getUnidade()))
                 .toList();
 
-        return new ProdutoHistoricoResponse(resumir(produto, compras), historico);
+        ProdutoUsuario correcao = produtoUsuarioRepository.findByUsuarioIdAndProdutoId(usuario.getId(), produtoId).orElse(null);
+        return new ProdutoHistoricoResponse(resumir(produto, compras, correcao), historico);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ProdutoHistoricoResponse historicoPorEan(String ean, User usuario) {
+        String codigo = ean == null ? "" : ean.replaceAll("\\D", "");
+        if (!NumeroBr.gtinValido(codigo)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, mensagens.get("produto.ean.invalido"));
+        }
+        Produto produto = produtoRepository.findByEan(NumeroBr.normalizarGtin(codigo))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, mensagens.get("produto.nunca.comprado")));
+        if (itemNotaRepository.findDoUsuarioPorProduto(usuario.getId(), produto.getId()).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, mensagens.get("produto.nunca.comprado"));
+        }
+        return historico(produto.getId(), usuario);
     }
 
     @Override
@@ -89,20 +113,21 @@ public class ProdutoServiceImpl implements ProdutoService {
         if (itemNotaRepository.findDoUsuarioPorProduto(usuario.getId(), produtoId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, mensagens.get("produto.nao.encontrado"));
         }
-        Produto produto = buscarProduto(produtoId);
-        produto.setNome(dto.nome().trim());
-        produto.setMarca(dto.marca());
-        produto.setCategoria(dto.categoria());
-        produtoRepository.save(produto);
+        ProdutoUsuario correcao = produtoUsuarioRepository.findByUsuarioIdAndProdutoId(usuario.getId(), produtoId)
+                .orElseGet(() -> ProdutoUsuario.builder()
+                        .usuario(usuario)
+                        .produto(buscarProduto(produtoId))
+                        .build());
+        correcao.setNome(dto.nome().trim());
+        correcao.setMarca(dto.marca());
+        correcao.setCategoria(dto.categoria());
+        produtoUsuarioRepository.save(correcao);
     }
 
-    private Produto criarMapeamento(ItemLido item, Mercado mercado) {
+    private Produto criarMapeamento(ItemLido item, Mercado mercado, ProdutoPadronizado sugestao) {
         Produto produto = Optional.ofNullable(item.ean())
                 .flatMap(produtoRepository::findByEan)
-                .orElseGet(() -> produtoRepository.save(Produto.builder()
-                        .ean(item.ean())
-                        .nome(nomeInicial(item.descricaoBruta()))
-                        .build()));
+                .orElseGet(() -> produtoRepository.save(novoProduto(item, sugestao)));
 
         mapeamentoRepository.save(MapeamentoDescricao.builder()
                 .descricaoBruta(item.descricaoBruta())
@@ -113,13 +138,27 @@ public class ProdutoServiceImpl implements ProdutoService {
         return produto;
     }
 
-    /** Enquanto a padronização com IA não entra, o nome é a descrição da nota em minúsculo. */
+    /** Sem sugestão (Cosmos e IA desligados ou sem resposta), o nome é a descrição da nota em minúsculo. */
+    private static Produto novoProduto(ItemLido item, ProdutoPadronizado sugestao) {
+        boolean temNome = sugestao != null && sugestao.nome() != null && !sugestao.nome().isBlank();
+        return Produto.builder()
+                .ean(item.ean())
+                .nome(temNome ? limitar(sugestao.nome().trim(), 200) : nomeInicial(item.descricaoBruta()))
+                .marca(sugestao == null ? null : limitar(sugestao.marca(), 100))
+                .categoria(sugestao == null ? null : limitar(sugestao.categoria(), 50))
+                .build();
+    }
+
     private static String nomeInicial(String descricaoBruta) {
         return descricaoBruta.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
-    /** Monta o comparativo a partir das compras, que vêm ordenadas da mais antiga para a mais recente. */
-    private ProdutoResumoResponse resumir(Produto produto, List<ItemNota> compras) {
+    private static String limitar(String texto, int tamanho) {
+        return texto == null || texto.length() <= tamanho ? texto : texto.substring(0, tamanho);
+    }
+
+    /** Monta o comparativo a partir das compras (da mais antiga para a mais recente), com a correção do usuário, se houver. */
+    private ProdutoResumoResponse resumir(Produto produto, List<ItemNota> compras, ProdutoUsuario correcao) {
         ItemNota ultima = compras.getLast();
         ItemNota menor = compras.stream().min(Comparator.comparing(ItemNota::getPrecoUnitario)).orElse(ultima);
         BigDecimal precoAnterior = compras.size() > 1 ? compras.get(compras.size() - 2).getPrecoUnitario() : null;
@@ -127,9 +166,9 @@ public class ProdutoServiceImpl implements ProdutoService {
 
         return new ProdutoResumoResponse(
                 produto.getId(),
-                produto.getNome(),
-                produto.getMarca(),
-                produto.getCategoria(),
+                correcao != null ? correcao.getNome() : produto.getNome(),
+                correcao != null ? correcao.getMarca() : produto.getMarca(),
+                correcao != null ? correcao.getCategoria() : produto.getCategoria(),
                 ultima.getPrecoUnitario(),
                 ultima.getNota().getDataEmissao(),
                 ultima.getNota().getMercado().getNome(),

@@ -3,6 +3,7 @@ package minhacestinha.api.controller.impl;
 import lombok.RequiredArgsConstructor;
 import minhacestinha.api.controller.GastoController;
 import minhacestinha.api.dto.response.GastoMensalResponse;
+import minhacestinha.api.dto.response.InflacaoResponse;
 import minhacestinha.api.persistence.entity.User;
 import minhacestinha.api.service.gasto.GastoService;
 import org.springframework.http.ResponseEntity;
@@ -19,5 +20,10 @@ public class GastoControllerImpl implements GastoController {
     @Override
     public ResponseEntity<List<GastoMensalResponse>> porMes(int meses, User usuario) {
         return ResponseEntity.ok(gastoService.porMes(usuario, meses));
+    }
+
+    @Override
+    public ResponseEntity<InflacaoResponse> inflacao(int meses, User usuario) {
+        return ResponseEntity.ok(gastoService.inflacao(usuario, meses));
     }
 }

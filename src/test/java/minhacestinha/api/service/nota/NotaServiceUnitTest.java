@@ -9,6 +9,7 @@ import minhacestinha.api.persistence.repository.MercadoRepository;
 import minhacestinha.api.persistence.repository.NotaRepository;
 import minhacestinha.api.service.nfce.Fixtures;
 import minhacestinha.api.service.nfce.NfceLeitor;
+import minhacestinha.api.service.padronizacao.PadronizacaoService;
 import minhacestinha.api.service.produto.ProdutoService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,9 @@ class NotaServiceUnitTest {
 
     @Mock
     private NfceLeitor nfceLeitor;
+
+    @Mock
+    private PadronizacaoService padronizacaoService;
 
     @Mock
     private NotaMapper notaMapper;

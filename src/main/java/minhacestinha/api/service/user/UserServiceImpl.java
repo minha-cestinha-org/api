@@ -2,12 +2,18 @@ package minhacestinha.api.service.user;
 
 import lombok.RequiredArgsConstructor;
 import minhacestinha.api.dto.auth.RegistrationDTO;
+import minhacestinha.api.dto.response.DadosUsuarioResponse;
 import minhacestinha.api.dto.response.UserResponse;
 import minhacestinha.api.message.Mensagens;
 import minhacestinha.api.persistence.entity.User;
 import minhacestinha.api.persistence.entity.UserRole;
+import minhacestinha.api.persistence.mapper.NotaMapper;
 import minhacestinha.api.persistence.mapper.UserMapper;
+import minhacestinha.api.persistence.repository.ItemNotaRepository;
+import minhacestinha.api.persistence.repository.NotaRepository;
+import minhacestinha.api.persistence.repository.ProdutoUsuarioRepository;
 import minhacestinha.api.persistence.repository.UserRepository;
+import minhacestinha.api.service.produto.ProdutoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,6 +30,11 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
+    private final NotaRepository notaRepository;
+    private final ItemNotaRepository itemNotaRepository;
+    private final ProdutoUsuarioRepository produtoUsuarioRepository;
+    private final NotaMapper notaMapper;
+    private final ProdutoService produtoService;
     private final Mensagens mensagens;
 
     @Override
@@ -56,5 +67,24 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse me(User user) {
         return userMapper.toResponse(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DadosUsuarioResponse exportarDados(User user) {
+        return new DadosUsuarioResponse(
+                userMapper.toResponse(user),
+                user.getTermosAceitosEm(),
+                notaRepository.findByUsuarioIdOrderByDataEmissaoDesc(user.getId()).stream().map(notaMapper::toResponse).toList(),
+                produtoService.listar(user));
+    }
+
+    @Override
+    @Transactional
+    public void apagarConta(User user) {
+        itemNotaRepository.apagarDoUsuario(user.getId());
+        notaRepository.apagarDoUsuario(user.getId());
+        produtoUsuarioRepository.apagarDoUsuario(user.getId());
+        userRepository.deleteById(user.getId());
     }
 }

@@ -29,6 +29,11 @@ public class ProdutoControllerImpl implements ProdutoController {
     }
 
     @Override
+    public ResponseEntity<ProdutoHistoricoResponse> historicoPorEan(String ean, User usuario) {
+        return ResponseEntity.ok(produtoService.historicoPorEan(ean, usuario));
+    }
+
+    @Override
     public ResponseEntity<Void> atualizar(Long id, ProdutoPutRequest dto, User usuario) {
         produtoService.atualizar(id, dto, usuario);
         return ResponseEntity.noContent().build();

@@ -17,6 +17,8 @@ import minhacestinha.api.persistence.repository.NotaRepository;
 import minhacestinha.api.service.nfce.NfceLeitor;
 import minhacestinha.api.service.nfce.NotaLida;
 import minhacestinha.api.service.nfce.QrCodeNfce;
+import minhacestinha.api.service.padronizacao.PadronizacaoService;
+import minhacestinha.api.service.padronizacao.ProdutoPadronizado;
 import minhacestinha.api.service.produto.ProdutoService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -35,12 +38,14 @@ public class NotaServiceImpl implements NotaService {
     private final MercadoRepository mercadoRepository;
     private final ProdutoService produtoService;
     private final NfceLeitor nfceLeitor;
+    private final PadronizacaoService padronizacaoService;
     private final NotaMapper notaMapper;
     private final TransactionTemplate transactionTemplate;
     private final Mensagens mensagens;
 
     /**
-     * A consulta à Sefaz fica fora da transação: ela pode levar segundos e não deve segurar conexão com o banco.
+     * A consulta à Sefaz e a padronização (Cosmos e Claude) ficam fora da transação:
+     * podem levar segundos e não devem segurar conexão com o banco.
      */
     @Override
     public NotaResponse importarPorQrCode(NotaQrCodeRequest dto, User usuario) {
@@ -49,8 +54,9 @@ public class NotaServiceImpl implements NotaService {
 
         NotaLida notaLida = nfceLeitor.ler(qrCode);
         notaLida.avisos().forEach(aviso -> log.warn("Nota {}: {}", notaLida.chaveAcesso(), aviso));
+        Map<String, ProdutoPadronizado> padronizados = padronizacaoService.padronizarNovos(notaLida);
 
-        return transactionTemplate.execute(status -> notaMapper.toResponse(salvar(notaLida, usuario)));
+        return transactionTemplate.execute(status -> notaMapper.toResponse(salvar(notaLida, padronizados, usuario)));
     }
 
     @Override
@@ -78,7 +84,7 @@ public class NotaServiceImpl implements NotaService {
         notaRepository.save(nota);
     }
 
-    private Nota salvar(NotaLida notaLida, User usuario) {
+    private Nota salvar(NotaLida notaLida, Map<String, ProdutoPadronizado> padronizados, User usuario) {
         validarNaoImportada(usuario, notaLida.chaveAcesso());
         Mercado mercado = buscarOuCriarMercado(notaLida);
 
@@ -102,7 +108,7 @@ public class NotaServiceImpl implements NotaService {
                 .unidade(item.unidade())
                 .precoUnitario(item.precoUnitario())
                 .precoTotal(item.precoTotal())
-                .produto(produtoService.resolver(item, mercado))
+                .produto(produtoService.resolver(item, mercado, padronizados.get(item.descricaoBruta())))
                 .build()));
 
         return notaRepository.save(nota);

@@ -25,6 +25,9 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: ${JWT_SECRET:-troque-este-segredo-em-producao}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      IA_MODELO: ${IA_MODELO:-claude-opus-5-5}
+      COSMOS_TOKEN: ${COSMOS_TOKEN:-}
     ports:
       - "8080:8080"
 

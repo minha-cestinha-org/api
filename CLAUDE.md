@@ -14,7 +14,8 @@ Java 21 · Spring Boot 4 · PostgreSQL 16 · Flyway · JWT (Auth0) · Jsoup · s
 **Serviço: interface + implementação**
 - `service/<dominio>/FooService.java` + `FooServiceImpl.java` (`@Service @RequiredArgsConstructor`).
 - Leitura com `@Transactional(readOnly = true)`, escrita com `@Transactional`.
-- Chamada externa lenta (Sefaz) fica **fora** da transação (ver `NotaServiceImpl.importarPorQrCode`).
+- Chamada externa lenta (Sefaz, Cosmos, Claude, Banco Central) fica **fora** da transação (ver `NotaServiceImpl.importarPorQrCode`).
+- Integração externa opcional falha em silêncio (loga e segue): sem chave ou fora do ar, o fluxo principal continua.
 
 **DTOs são records** em `dto/request`, `dto/response` e `dto/auth`, com Bean Validation e `@Schema`.
 
@@ -33,7 +34,7 @@ O `GlobalExceptionHandler` formata tudo em `ErrorResponse`. Erro inesperado vira
 ## Regras
 
 1. **Migrations**: nunca altere uma migration já existente. Crie `V{n+1}__descricao.sql`.
-2. **Soft delete**: registros com `ativo` nunca são apagados, só `ativo = false`.
+2. **Soft delete**: registros com `ativo` nunca são apagados, só `ativo = false`. Única exceção: `DELETE /api/users/me` (LGPD) apaga tudo do usuário de verdade.
 3. **Nunca retorne entidade JPA** no controller. Converta para DTO (mappers em `persistence/mapper`).
 4. **Todo dado é do usuário logado**: sempre filtre por `usuario.getId()` nas consultas.
 5. **Endpoint novo público** precisa entrar em `SecurityConfig` (o padrão é exigir autenticação).

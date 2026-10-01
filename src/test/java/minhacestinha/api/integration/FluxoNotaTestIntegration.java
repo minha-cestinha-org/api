@@ -1,6 +1,7 @@
 package minhacestinha.api.integration;
 
 import com.jayway.jsonpath.JsonPath;
+import minhacestinha.api.service.gasto.IpcaClient;
 import minhacestinha.api.service.nfce.Fixtures;
 import minhacestinha.api.service.nfce.SefazClient;
 import org.junit.jupiter.api.Test;
@@ -16,12 +17,16 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.time.Clock;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -31,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * Fluxo completo com banco (H2 no modo PostgreSQL, migrations do Flyway) e a Sefaz simulada:
- * cadastro → login → importar nota → compras → preços → gastos → correção → remoção.
+ * cadastro → login → importar nota → compras → preços → gastos → correção → remoção → exportar → apagar conta.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -42,6 +47,9 @@ class FluxoNotaTestIntegration {
 
     @MockitoBean
     private SefazClient sefazClient;
+
+    @MockitoBean
+    private IpcaClient ipcaClient;
 
     @TestConfiguration
     static class RelogioFixo {
@@ -56,6 +64,7 @@ class FluxoNotaTestIntegration {
     @Test
     void importaNotaEMostraPrecosEGastos() throws Exception {
         when(sefazClient.buscar(anyString())).thenReturn(Fixtures.html("sp-nota-exemplo.html"));
+        when(ipcaClient.acumulado(any(), any())).thenReturn(Optional.of(new BigDecimal("4.10")));
 
         mockMvc.perform(json(post("/api/auth/register"), """
                         {"nome": "Eduardo", "email": "Edu@Email.com", "senha": "senha-forte-123", "aceitouTermos": true}
@@ -113,6 +122,12 @@ class FluxoNotaTestIntegration {
         mockMvc.perform(get("/api/gastos/mensal?meses=0").header("Authorization", token))
                 .andExpect(status().isBadRequest());
 
+        mockMvc.perform(get("/api/gastos/inflacao").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mesInicio").value("2025-10"))
+                .andExpect(jsonPath("$.ipca").value(4.10))
+                .andExpect(jsonPath("$.produtosComparados").value(0));
+
         mockMvc.perform(json(put("/api/produtos/" + produtoId), """
                         {"nome": "leite integral itambé 1L", "marca": "itambé", "categoria": "frios e laticínios"}
                         """).header("Authorization", token))
@@ -130,6 +145,24 @@ class FluxoNotaTestIntegration {
         mockMvc.perform(get("/api/notas").header("Authorization", token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
+
+        mockMvc.perform(get("/api/users/me/dados").header("Authorization", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.conta.email").value("edu@email.com"))
+                .andExpect(jsonPath("$.termosAceitosEm").exists())
+                .andExpect(jsonPath("$.notas", hasSize(1)))
+                .andExpect(jsonPath("$.notas[0].itens", hasSize(4)));
+
+        mockMvc.perform(delete("/api/users/me").header("Authorization", token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/users/me").header("Authorization", token))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(json(post("/api/auth/login"), """
+                        {"email": "edu@email.com", "senha": "senha-forte-123"}
+                        """))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

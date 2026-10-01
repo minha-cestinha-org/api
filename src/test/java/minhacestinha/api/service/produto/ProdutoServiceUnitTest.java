@@ -7,11 +7,14 @@ import minhacestinha.api.persistence.entity.MapeamentoDescricao;
 import minhacestinha.api.persistence.entity.Mercado;
 import minhacestinha.api.persistence.entity.Nota;
 import minhacestinha.api.persistence.entity.Produto;
+import minhacestinha.api.persistence.entity.ProdutoUsuario;
 import minhacestinha.api.persistence.entity.User;
 import minhacestinha.api.persistence.repository.ItemNotaRepository;
 import minhacestinha.api.persistence.repository.MapeamentoDescricaoRepository;
 import minhacestinha.api.persistence.repository.ProdutoRepository;
+import minhacestinha.api.persistence.repository.ProdutoUsuarioRepository;
 import minhacestinha.api.service.nfce.NotaLida.ItemLido;
+import minhacestinha.api.service.padronizacao.ProdutoPadronizado;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,6 +45,9 @@ class ProdutoServiceUnitTest {
     private ItemNotaRepository itemNotaRepository;
 
     @Mock
+    private ProdutoUsuarioRepository produtoUsuarioRepository;
+
+    @Mock
     private Mensagens mensagens;
 
     @InjectMocks
@@ -55,7 +61,7 @@ class ProdutoServiceUnitTest {
         when(mapeamentoRepository.findByDescricaoBrutaAndMercadoId("LTE COND INTEG ITAMB 1L", 1L))
                 .thenReturn(Optional.of(MapeamentoDescricao.builder().produto(leite).build()));
 
-        Produto produto = service.resolver(item("LTE COND INTEG ITAMB 1L", "7896051111115"), mercado);
+        Produto produto = service.resolver(item("LTE COND INTEG ITAMB 1L", "7896051111115"), mercado, null);
 
         assertThat(produto).isSameAs(leite);
         verify(produtoRepository, never()).save(any());
@@ -67,7 +73,7 @@ class ProdutoServiceUnitTest {
         when(mapeamentoRepository.findByDescricaoBrutaAndMercadoId(any(), any())).thenReturn(Optional.empty());
         when(produtoRepository.findByEan("7896051111115")).thenReturn(Optional.of(leite));
 
-        Produto produto = service.resolver(item("LEITE INT ITAMBE 1LT", "7896051111115"), mercado);
+        Produto produto = service.resolver(item("LEITE INT ITAMBE 1LT", "7896051111115"), mercado, null);
 
         assertThat(produto).isSameAs(leite);
         verify(produtoRepository, never()).save(any());
@@ -79,10 +85,23 @@ class ProdutoServiceUnitTest {
         when(mapeamentoRepository.findByDescricaoBrutaAndMercadoId(any(), any())).thenReturn(Optional.empty());
         when(produtoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Produto produto = service.resolver(item("BAN  PRATA KG", null), mercado);
+        Produto produto = service.resolver(item("BAN  PRATA KG", null), mercado, null);
 
         assertThat(produto.getNome()).isEqualTo("ban prata kg");
         assertThat(produto.getEan()).isNull();
+    }
+
+    @Test
+    void usaASugestaoDePadronizacaoAoCriarProduto() {
+        when(mapeamentoRepository.findByDescricaoBrutaAndMercadoId(any(), any())).thenReturn(Optional.empty());
+        when(produtoRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Produto produto = service.resolver(item("LTE COND INTEG ITAMB 1L", null), mercado,
+                new ProdutoPadronizado("leite integral itambé 1L", "itambé", "frios e laticínios"));
+
+        assertThat(produto.getNome()).isEqualTo("leite integral itambé 1L");
+        assertThat(produto.getMarca()).isEqualTo("itambé");
+        assertThat(produto.getCategoria()).isEqualTo("frios e laticínios");
     }
 
     @Test
@@ -104,6 +123,22 @@ class ProdutoServiceUnitTest {
         assertThat(resumo.mercadoMenorPreco()).isEqualTo("super econômico");
         assertThat(resumo.precoMedio()).isEqualByComparingTo("6.79");
         assertThat(resumo.vezesComprado()).isEqualTo(3);
+    }
+
+    @Test
+    void correcaoDoUsuarioSobrepoeONomeSemMexerNoCatalogo() {
+        User usuario = User.builder().id(1L).build();
+        Produto leite = Produto.builder().id(10L).nome("lte cond integ itamb 1l").build();
+        when(itemNotaRepository.findDoUsuario(1L)).thenReturn(List.of(
+                compra(leite, mercado, "7.90", LocalDateTime.of(2026, 9, 26, 10, 0))));
+        when(produtoUsuarioRepository.findByUsuarioId(1L)).thenReturn(List.of(ProdutoUsuario.builder()
+                .produto(leite).nome("leite integral itambé 1L").marca("itambé").build()));
+
+        ProdutoResumoResponse resumo = service.listar(usuario).getFirst();
+
+        assertThat(resumo.nome()).isEqualTo("leite integral itambé 1L");
+        assertThat(resumo.marca()).isEqualTo("itambé");
+        assertThat(leite.getNome()).isEqualTo("lte cond integ itamb 1l");
     }
 
     private static ItemLido item(String descricao, String ean) {
