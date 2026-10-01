@@ -2,6 +2,7 @@ package minhacestinha.api.controller.impl;
 
 import lombok.RequiredArgsConstructor;
 import minhacestinha.api.controller.UserController;
+import minhacestinha.api.dto.request.PrivacidadeRequest;
 import minhacestinha.api.dto.response.DadosUsuarioResponse;
 import minhacestinha.api.dto.response.UserResponse;
 import minhacestinha.api.persistence.entity.User;
@@ -18,6 +19,11 @@ public class UserControllerImpl implements UserController {
     @Override
     public ResponseEntity<UserResponse> me(User usuario) {
         return ResponseEntity.ok(userService.me(usuario));
+    }
+
+    @Override
+    public ResponseEntity<UserResponse> atualizarPrivacidade(PrivacidadeRequest dto, User usuario) {
+        return ResponseEntity.ok(userService.atualizarPrivacidade(usuario, dto));
     }
 
     @Override

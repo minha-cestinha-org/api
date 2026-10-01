@@ -2,6 +2,7 @@ package minhacestinha.api.service.user;
 
 import lombok.RequiredArgsConstructor;
 import minhacestinha.api.dto.auth.RegistrationDTO;
+import minhacestinha.api.dto.request.PrivacidadeRequest;
 import minhacestinha.api.dto.response.DadosUsuarioResponse;
 import minhacestinha.api.dto.response.UserResponse;
 import minhacestinha.api.message.Mensagens;
@@ -12,6 +13,7 @@ import minhacestinha.api.persistence.mapper.UserMapper;
 import minhacestinha.api.persistence.repository.ItemNotaRepository;
 import minhacestinha.api.persistence.repository.NotaRepository;
 import minhacestinha.api.persistence.repository.ProdutoUsuarioRepository;
+import minhacestinha.api.persistence.repository.RedefinicaoSenhaRepository;
 import minhacestinha.api.persistence.repository.UserRepository;
 import minhacestinha.api.service.produto.ProdutoService;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
@@ -33,8 +36,10 @@ public class UserServiceImpl implements UserService {
     private final NotaRepository notaRepository;
     private final ItemNotaRepository itemNotaRepository;
     private final ProdutoUsuarioRepository produtoUsuarioRepository;
+    private final RedefinicaoSenhaRepository redefinicaoSenhaRepository;
     private final NotaMapper notaMapper;
     private final ProdutoService produtoService;
+    private final Clock clock;
     private final Mensagens mensagens;
 
     @Override
@@ -51,7 +56,7 @@ public class UserServiceImpl implements UserService {
                 .senha(passwordEncoder.encode(dto.senha()))
                 .role(UserRole.USUARIO)
                 .ativo(true)
-                .termosAceitosEm(LocalDateTime.now())
+                .termosAceitosEm(LocalDateTime.now(clock))
                 .build();
 
         return userMapper.toResponse(userRepository.save(user));
@@ -60,7 +65,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void atualizarUltimoLogin(User user) {
-        user.setUltimoLogin(LocalDateTime.now());
+        user.setUltimoLogin(LocalDateTime.now(clock));
         userRepository.save(user);
     }
 
@@ -70,11 +75,23 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public UserResponse atualizarPrivacidade(User user, PrivacidadeRequest dto) {
+        if (!dto.compartilharPrecos().equals(user.getCompartilharPrecos())) {
+            user.setCompartilharPrecos(dto.compartilharPrecos());
+            user.setCompartilharPrecosEm(LocalDateTime.now(clock));
+            userRepository.save(user);
+        }
+        return userMapper.toResponse(user);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public DadosUsuarioResponse exportarDados(User user) {
         return new DadosUsuarioResponse(
                 userMapper.toResponse(user),
                 user.getTermosAceitosEm(),
+                user.getCompartilharPrecosEm(),
                 notaRepository.findByUsuarioIdOrderByDataEmissaoDesc(user.getId()).stream().map(notaMapper::toResponse).toList(),
                 produtoService.listar(user));
     }
@@ -85,6 +102,7 @@ public class UserServiceImpl implements UserService {
         itemNotaRepository.apagarDoUsuario(user.getId());
         notaRepository.apagarDoUsuario(user.getId());
         produtoUsuarioRepository.apagarDoUsuario(user.getId());
+        redefinicaoSenhaRepository.apagarDoUsuario(user.getId());
         userRepository.deleteById(user.getId());
     }
 }

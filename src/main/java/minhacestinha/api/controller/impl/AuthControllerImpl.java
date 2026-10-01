@@ -3,7 +3,9 @@ package minhacestinha.api.controller.impl;
 import lombok.RequiredArgsConstructor;
 import minhacestinha.api.controller.AuthController;
 import minhacestinha.api.dto.auth.AuthenticationDTO;
+import minhacestinha.api.dto.auth.EsqueciSenhaRequest;
 import minhacestinha.api.dto.auth.LoginResponseDTO;
+import minhacestinha.api.dto.auth.RedefinirSenhaRequest;
 import minhacestinha.api.dto.auth.RefreshTokenRequest;
 import minhacestinha.api.dto.auth.RegistrationDTO;
 import minhacestinha.api.dto.response.UserResponse;
@@ -11,6 +13,7 @@ import minhacestinha.api.message.Mensagens;
 import minhacestinha.api.persistence.entity.User;
 import minhacestinha.api.persistence.repository.UserRepository;
 import minhacestinha.api.service.security.TokenService;
+import minhacestinha.api.service.user.SenhaService;
 import minhacestinha.api.service.user.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,7 @@ public class AuthControllerImpl implements AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
+    private final SenhaService senhaService;
     private final TokenService tokenService;
     private final UserRepository userRepository;
     private final Mensagens mensagens;
@@ -48,11 +52,26 @@ public class AuthControllerImpl implements AuthController {
     @Override
     public ResponseEntity<LoginResponseDTO> refresh(RefreshTokenRequest dto) {
         String email = tokenService.validateRefreshToken(dto.refreshToken().trim());
-        User user = email == null ? null : userRepository.findByEmail(email).filter(User::isEnabled).orElse(null);
+        User user = email == null ? null : userRepository.findByEmail(email)
+                .filter(User::isEnabled)
+                .filter(encontrado -> tokenService.versaoValida(dto.refreshToken().trim(), encontrado))
+                .orElse(null);
         if (user == null) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, mensagens.get("erro.autenticacao"));
         }
         return ResponseEntity.ok(gerarTokens(user));
+    }
+
+    @Override
+    public ResponseEntity<Void> esqueciSenha(EsqueciSenhaRequest dto) {
+        senhaService.solicitarRedefinicao(dto.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<Void> redefinirSenha(RedefinirSenhaRequest dto) {
+        senhaService.redefinir(dto);
+        return ResponseEntity.noContent().build();
     }
 
     private LoginResponseDTO gerarTokens(User user) {

@@ -6,7 +6,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import minhacestinha.api.dto.auth.AuthenticationDTO;
+import minhacestinha.api.dto.auth.EsqueciSenhaRequest;
 import minhacestinha.api.dto.auth.LoginResponseDTO;
+import minhacestinha.api.dto.auth.RedefinirSenhaRequest;
 import minhacestinha.api.dto.auth.RefreshTokenRequest;
 import minhacestinha.api.dto.auth.RegistrationDTO;
 import minhacestinha.api.dto.response.UserResponse;
@@ -15,7 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-@Tag(name = "Autenticação", description = "Cadastro, login e renovação de token")
+@Tag(name = "Autenticação", description = "Cadastro, login, renovação de token e redefinição de senha")
 @RequestMapping("/api/auth")
 public interface AuthController {
 
@@ -43,4 +45,24 @@ public interface AuthController {
             @ApiResponse(responseCode = "401", description = "Refresh token inválido ou expirado")
     })
     ResponseEntity<LoginResponseDTO> refresh(@RequestBody @Valid RefreshTokenRequest dto);
+
+    @PostMapping("/senha/esqueci")
+    @Operation(summary = "Esqueci a senha",
+            description = "Manda um código de 6 números pro e-mail, válido por 15 minutos. "
+                    + "Responde 204 mesmo se o e-mail não tiver conta.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Pedido recebido"),
+            @ApiResponse(responseCode = "400", description = "Email inválido")
+    })
+    ResponseEntity<Void> esqueciSenha(@RequestBody @Valid EsqueciSenhaRequest dto);
+
+    @PostMapping("/senha/redefinir")
+    @Operation(summary = "Redefinir senha",
+            description = "Troca a senha com o código recebido por e-mail. Depois de 5 erros o código deixa de valer. "
+                    + "Os tokens antigos param de funcionar.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Senha alterada"),
+            @ApiResponse(responseCode = "400", description = "Código inválido ou expirado")
+    })
+    ResponseEntity<Void> redefinirSenha(@RequestBody @Valid RedefinirSenhaRequest dto);
 }

@@ -61,6 +61,22 @@ public class User extends AuditoriaBase implements UserDetails {
     @Column(name = "ultimo_login")
     private LocalDateTime ultimoLogin;
 
+    /** Vai dentro do token. Trocar a senha incrementa e os tokens antigos deixam de valer. */
+    @Builder.Default
+    @Column(name = "versao_token")
+    private Integer versaoToken = 0;
+
+    @Column(name = "senha_alterada_em")
+    private LocalDateTime senhaAlteradaEm;
+
+    /** Consentimento pro "preço da galera" (opt-in). */
+    @Builder.Default
+    @Column(name = "compartilhar_precos")
+    private Boolean compartilharPrecos = false;
+
+    @Column(name = "compartilhar_precos_em")
+    private LocalDateTime compartilharPrecosEm;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));

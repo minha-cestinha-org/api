@@ -19,6 +19,7 @@ public class TokenService {
 
     private static final String ISSUER_ACCESS = "minhacestinha_api";
     private static final String ISSUER_REFRESH = "minhacestinha_refresh";
+    private static final String CLAIM_VERSAO = "versao";
     private static final Duration DURACAO_ACCESS = Duration.ofHours(1);
     private static final Duration DURACAO_REFRESH = Duration.ofDays(30);
 
@@ -45,12 +46,19 @@ public class TokenService {
         return validar(token, ISSUER_REFRESH);
     }
 
+    /** O token foi emitido antes da última troca de senha? Token sem versão conta como 0. */
+    public boolean versaoValida(String token, User user) {
+        Integer versao = JWT.decode(token).getClaim(CLAIM_VERSAO).asInt();
+        return (versao == null ? 0 : versao) == user.getVersaoToken();
+    }
+
     private String gerar(User user, String issuer, Duration duracao, String codigoErro) {
         try {
             return JWT.create()
                     .withIssuer(issuer)
                     .withSubject(user.getEmail())
                     .withClaim("role", user.getRole().name())
+                    .withClaim(CLAIM_VERSAO, user.getVersaoToken())
                     .withExpiresAt(Instant.now().plus(duracao))
                     .sign(Algorithm.HMAC256(secret));
         } catch (JWTCreationException exception) {

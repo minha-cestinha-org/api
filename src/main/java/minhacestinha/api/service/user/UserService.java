@@ -1,6 +1,7 @@
 package minhacestinha.api.service.user;
 
 import minhacestinha.api.dto.auth.RegistrationDTO;
+import minhacestinha.api.dto.request.PrivacidadeRequest;
 import minhacestinha.api.dto.response.DadosUsuarioResponse;
 import minhacestinha.api.dto.response.UserResponse;
 import minhacestinha.api.persistence.entity.User;
@@ -12,6 +13,9 @@ public interface UserService {
     void atualizarUltimoLogin(User user);
 
     UserResponse me(User user);
+
+    /** Liga ou desliga o "preço da galera" e guarda quando mudou. */
+    UserResponse atualizarPrivacidade(User user, PrivacidadeRequest dto);
 
     /** Exporta tudo que guardamos do usuário. */
     DadosUsuarioResponse exportarDados(User user);

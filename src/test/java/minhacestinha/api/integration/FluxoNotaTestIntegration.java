@@ -1,10 +1,12 @@
 package minhacestinha.api.integration;
 
 import com.jayway.jsonpath.JsonPath;
+import minhacestinha.api.service.email.EmailService;
 import minhacestinha.api.service.gasto.IpcaClient;
 import minhacestinha.api.service.nfce.Fixtures;
 import minhacestinha.api.service.nfce.SefazClient;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -25,6 +27,8 @@ import java.util.Optional;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -50,6 +54,9 @@ class FluxoNotaTestIntegration {
 
     @MockitoBean
     private IpcaClient ipcaClient;
+
+    @MockitoBean
+    private EmailService emailService;
 
     @TestConfiguration
     static class RelogioFixo {
@@ -166,6 +173,60 @@ class FluxoNotaTestIntegration {
     }
 
     @Test
+    void redefineSenhaComCodigoDoEmailEDerrubaTokensAntigos() throws Exception {
+        mockMvc.perform(json(post("/api/auth/register"), """
+                        {"nome": "Ana", "email": "ana@email.com", "senha": "senha-antiga-1", "aceitouTermos": true}
+                        """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.compartilharPrecos").value(false));
+        String tokenAntigo = "Bearer " + JsonPath.read(login("ana@email.com", "senha-antiga-1"), "$.token");
+
+        mockMvc.perform(json(patch("/api/users/me/privacidade"), """
+                        {"compartilharPrecos": true}
+                        """).header("Authorization", tokenAntigo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.compartilharPrecos").value(true));
+        mockMvc.perform(get("/api/users/me/dados").header("Authorization", tokenAntigo))
+                .andExpect(jsonPath("$.conta.compartilharPrecos").value(true))
+                .andExpect(jsonPath("$.compartilharPrecosEm").exists());
+
+        mockMvc.perform(json(post("/api/auth/senha/esqueci"), """
+                        {"email": "ninguem@email.com"}
+                        """))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(json(post("/api/auth/senha/esqueci"), """
+                        {"email": "Ana@Email.com"}
+                        """))
+                .andExpect(status().isNoContent());
+        ArgumentCaptor<String> codigo = ArgumentCaptor.forClass(String.class);
+        verify(emailService).enviarCodigoRedefinicao(eq("ana@email.com"), eq("Ana"), codigo.capture());
+
+        String errado = codigo.getValue().equals("000000") ? "111111" : "000000";
+        mockMvc.perform(json(post("/api/auth/senha/redefinir"), """
+                        {"email": "ana@email.com", "codigo": "%s", "novaSenha": "senha-nova-123"}
+                        """.formatted(errado)))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(json(post("/api/auth/senha/redefinir"), """
+                        {"email": "ana@email.com", "codigo": "%s", "novaSenha": "senha-nova-123"}
+                        """.formatted(codigo.getValue())))
+                .andExpect(status().isNoContent());
+        mockMvc.perform(json(post("/api/auth/senha/redefinir"), """
+                        {"email": "ana@email.com", "codigo": "%s", "novaSenha": "outra-senha-123"}
+                        """.formatted(codigo.getValue())))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/users/me").header("Authorization", tokenAntigo))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(json(post("/api/auth/login"), """
+                        {"email": "ana@email.com", "senha": "senha-antiga-1"}
+                        """))
+                .andExpect(status().isUnauthorized());
+        String tokenNovo = "Bearer " + JsonPath.read(login("ana@email.com", "senha-nova-123"), "$.token");
+        mockMvc.perform(get("/api/users/me").header("Authorization", tokenNovo))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void recusaCadastroSemAceitarOsTermos() throws Exception {
         mockMvc.perform(json(post("/api/auth/register"), """
                         {"nome": "Sem termos", "email": "semtermos@email.com", "senha": "senha-forte-123", "aceitouTermos": false}
@@ -179,6 +240,14 @@ class FluxoNotaTestIntegration {
                         {"email": "ninguem@email.com", "senha": "errada-123"}
                         """))
                 .andExpect(status().isUnauthorized());
+    }
+
+    private String login(String email, String senha) throws Exception {
+        return mockMvc.perform(json(post("/api/auth/login"), """
+                        {"email": "%s", "senha": "%s"}
+                        """.formatted(email, senha)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
     }
 
     private static MockHttpServletRequestBuilder json(MockHttpServletRequestBuilder request, String body) {

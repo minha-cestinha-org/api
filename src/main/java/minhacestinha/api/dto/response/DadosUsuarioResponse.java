@@ -10,6 +10,8 @@ public record DadosUsuarioResponse(
         UserResponse conta,
         @Schema(description = "Quando o usuário aceitou os termos de uso")
         LocalDateTime termosAceitosEm,
+        @Schema(description = "Quando o usuário mudou o consentimento do \"preço da galera\" pela última vez")
+        LocalDateTime compartilharPrecosEm,
         @Schema(description = "Todas as notas importadas, inclusive as removidas do histórico")
         List<NotaResponse> notas,
         @Schema(description = "Produtos comprados, com os nomes corrigidos pelo usuário")

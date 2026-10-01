@@ -35,6 +35,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             if (email != null) {
                 userRepository.findByEmail(email)
                         .filter(user -> user.isEnabled())
+                        .filter(user -> tokenService.versaoValida(token, user))
                         .ifPresent(user -> SecurityContextHolder.getContext().setAuthentication(
                                 new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities())));
             }

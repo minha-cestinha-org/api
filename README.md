@@ -49,7 +49,10 @@ export $(cat .env | xargs)
 | POST | `/api/auth/register` | cria conta (aceite dos termos obrigatório) |
 | POST | `/api/auth/login` | login, devolve `token` e `refreshToken` |
 | POST | `/api/auth/refresh` | renova os tokens |
+| POST | `/api/auth/senha/esqueci` | manda um código de 6 números por e-mail (vale 15 min) |
+| POST | `/api/auth/senha/redefinir` | troca a senha com o código; derruba os tokens antigos |
 | GET | `/api/users/me` | dados da conta |
+| PATCH | `/api/users/me/privacidade` | liga/desliga o "preço da galera" (opt-in) |
 | GET | `/api/users/me/dados` | baixar todos os meus dados (LGPD) |
 | DELETE | `/api/users/me` | apagar a conta e tudo do usuário |
 | POST | `/api/notas/qrcode` | importa a nota a partir do QR code (ou da chave de acesso) |
@@ -83,6 +86,7 @@ export $(cat .env | xargs)
 | `ANTHROPIC_API_KEY` | não | padronização de nomes com Claude |
 | `IA_MODELO` | não | modelo do Claude (padrão `claude-opus-5-5`) |
 | `COSMOS_TOKEN` | não | catálogo de produtos por EAN |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | pra produção | SMTP do e-mail de redefinição de senha (sem `MAIL_HOST`, o envio só é logado) |
 
 Por enquanto só **SP**. Para outro estado: criar `NfceXxParser implements NfceParser` e ele é registrado sozinho.
 

@@ -6,6 +6,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import minhacestinha.api.dto.request.PrivacidadeRequest;
 import minhacestinha.api.dto.response.DadosUsuarioResponse;
 import minhacestinha.api.dto.response.UserResponse;
 import minhacestinha.api.persistence.entity.User;
@@ -13,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Tag(name = "Usuários", description = "Dados da conta")
@@ -27,6 +31,16 @@ public interface UserController {
             @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
     })
     ResponseEntity<UserResponse> me(@Parameter(hidden = true) @AuthenticationPrincipal User usuario);
+
+    @PatchMapping("/me/privacidade")
+    @Operation(summary = "Privacidade", description = "Liga ou desliga o compartilhamento anônimo de preços (preço da galera).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Preferência salva"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos"),
+            @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
+    })
+    ResponseEntity<UserResponse> atualizarPrivacidade(@RequestBody @Valid PrivacidadeRequest dto,
+                                                      @Parameter(hidden = true) @AuthenticationPrincipal User usuario);
 
     @GetMapping("/me/dados")
     @Operation(summary = "Baixar meus dados", description = "Conta, notas e produtos do usuário logado (LGPD).")
